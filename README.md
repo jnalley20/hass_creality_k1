@@ -92,4 +92,4 @@ Contributions are welcome! Please open an issue or submit a pull request on the 
 
 ## License
 
-[Specify your license here, e.g., Apache 2.0, MIT]
+GPL-3.0 license
