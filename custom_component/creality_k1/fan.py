@@ -17,14 +17,6 @@ from .websocket import MyWebSocket
 
 _LOGGER = logging.getLogger(__name__)
 
-# Data keys from printer AND GCODE P-index
-# Tuple: (Percentage Key, Toggle Key, GCODE P-Index)
-#FAN_CONFIG = {
-#    "Model Fan": ("modelFanPct", "fan", 0),  # P0 for Case Fan
-#    "Case Fan": ("caseFanPct", "fanCase", 1), # P1 for Case Fan
-#    "Side Fan": ("auxiliaryFanPct", "fanAuxiliary", 2), # P2 for Aux Fan
-#}
-
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: ConfigEntry,

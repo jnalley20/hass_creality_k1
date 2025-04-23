@@ -14,8 +14,6 @@ from .coordinator import CrealityK1DataUpdateCoordinator  # Din DataUpdateCoordi
 
 _LOGGER = logging.getLogger(__name__)
 
-#PLATFORMS = [Platform.SENSOR, Platform.SWITCH, Platform.FAN]
-
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Creality K1 Max from a config entry."""
     # 1. Hämta konfigurationsdata från config entry

@@ -88,7 +88,7 @@ This is a custom integration and is not officially supported by Home Assistant o
 
 ## Contributing
 
-Contributions are welcome! Please open an issue or submit a pull request on the [GitHub repository](https://github.com/hurricaneb/creality_k1).
+Contributions are welcome! Please open an issue or submit a pull request on the [GitHub repository](https://github.com/hurricaneb/hass_creality_k1).
 
 ## License
 

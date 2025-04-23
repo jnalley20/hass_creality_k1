@@ -11,10 +11,9 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .const import DOMAIN
-from .websocket import MyWebSocket  # Din MyWebSocket klass
+from .websocket import MyWebSocket  # MyWebSocket class from websockets.py
 
 _LOGGER = logging.getLogger(__name__)
-
 
 class CrealityK1DataUpdateCoordinator(DataUpdateCoordinator):
     """Class to manage fetching data from the Creality K1."""

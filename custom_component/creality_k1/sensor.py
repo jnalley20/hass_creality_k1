@@ -10,10 +10,9 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, PRINTER_STATE_MAP, DEFAULT_PRINTER_STATE
-from .coordinator import CrealityK1DataUpdateCoordinator  # Din DataUpdateCoordinator
+from .coordinator import CrealityK1DataUpdateCoordinator  # DataUpdateCoordinator class from coordinator.py
 
 _LOGGER = logging.getLogger(__name__)
-
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -380,13 +379,12 @@ class K1PrintState(K1Sensor):
 
 
     @property
-    def native_value(self) -> str | None: # Ändra returtyp till str | None
+    def native_value(self) -> str | None: 
         """Return The Printers State as a descriptive string."""
         raw_state_value = None
         if self.coordinator.data:
             raw_state_value = self.coordinator.data.get("state")
 
-        # Försök konvertera till int om det är en sträng eller redan int
         int_state: int | None = None
         if isinstance(raw_state_value, (int, str)):
             try:
@@ -397,10 +395,7 @@ class K1PrintState(K1Sensor):
              _LOGGER.warning(f"Unexpected state value type: {type(raw_state_value)} ({raw_state_value})")
 
 
-        # Om vi har ett giltigt heltal, slå upp i mappningen
         if int_state is not None:
-            # .get() returnerar strängen om nyckeln finns, annars DEFAULT_PRINTER_STATE
             return PRINTER_STATE_MAP.get(int_state, DEFAULT_PRINTER_STATE)
 
-        # Om ingen data eller ogiltigt state, returnera default
-        return DEFAULT_PRINTER_STATE # Eller returnera None om du föredrar det för okänt state
+        return DEFAULT_PRINTER_STATE 

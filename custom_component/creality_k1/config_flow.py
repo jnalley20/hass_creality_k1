@@ -21,11 +21,6 @@ class CannotConnect(HomeAssistantError):
 
 async def validate_connection(hass: HomeAssistant, ip_address: str) -> None:
     """Validate the connection to the Creality K1."""
-    #import websockets  # Importera websockets här!
-    #import json
-    # Här kan du lägga till logik för att verifiera att du kan ansluta till skrivaren
-    # Du kan t.ex. försöka öppna en WebSocket-anslutning eller göra ett HTTP-anrop
-    # Exempel (WebSocket):
     ws_url = f"ws://{ip_address}:9999"
     try:
         async with websockets.connect(ws_url, open_timeout=5) as websocket:
