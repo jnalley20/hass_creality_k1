@@ -10,6 +10,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.entity import DeviceInfo
 
 from .const import DOMAIN, FAN_CONFIG, FAN_NAME_AUXILIARY_FAN, FAN_NAME_CASE_FAN, FAN_NAME_MODEL_FAN
 from .coordinator import CrealityK1DataUpdateCoordinator
@@ -23,9 +24,8 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Creality K1 fans from a config entry."""
-    coordinator: CrealityK1DataUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]
-    websocket: MyWebSocket = hass.data[DOMAIN]["websocket"]
-
+    coordinator: CrealityK1DataUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]["coordinator"] # Get correct coordinator when having multiple printers
+    websocket: MyWebSocket = hass.data[DOMAIN][config_entry.entry_id]["websocket"] # Get correct websocket when having multiple printers
     fans = []
     icons = {
         FAN_NAME_MODEL_FAN: "mdi:fan-speed-1",
@@ -40,6 +40,7 @@ async def async_setup_entry(
                 percent_key,
                 toggle_key,
                 p_index, # Pass GCODE P-index
+                config_entry,
                 name,
                 icons.get(name, "mdi:fan"),
             )
@@ -60,6 +61,7 @@ class K1Fan(CoordinatorEntity, FanEntity):
         percentage_key: str,
         toggle_key: str,
         p_index: int, # GCODE P-Index (P0, P1, P2)
+        entry: ConfigEntry,
         name: str,
         icon: str,
     ) -> None:
@@ -69,10 +71,15 @@ class K1Fan(CoordinatorEntity, FanEntity):
         self._percentage_key = percentage_key
         self._toggle_key = toggle_key
         self._p_index = p_index # Store GCODE P-index
-
         self._attr_name = name
         self._attr_icon = icon
-        self._attr_unique_id = f"creality_k1_fan_{self._toggle_key.lower()}"
+        self._attr_unique_id = f"{entry.entry_id}_fan_{toggle_key.lower()}"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)}, # Koppla till enheten via config entry ID
+            name=entry.title, # Standardnamn, uppdateras i __init__.py
+            manufacturer="Creality",
+            model=coordinator.data.get("model", "K1 Series"),
+        )
 
         _LOGGER.debug(
             f"Initializing Fan: {self.name} ({self.unique_id}) "

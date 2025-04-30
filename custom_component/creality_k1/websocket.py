@@ -72,36 +72,30 @@ class MyWebSocket:
 
     async def handle_message(self, message: str) -> None:
         """Process a received message."""
-        # Logga det råa meddelandet på DEBUG-nivå om du vill se allt
-        # _LOGGER.debug(f"Raw message received: {message}")
+        # Log RAW data in DEBUG-mode
+        _LOGGER.debug(f"Raw message received: {message}")
 
-        # Kolla om det är ett enkelt "ok" innan JSON-tolkning
-        # Använd .strip().lower() för att vara robust mot ev. blanksteg/skiftläge
         if message.strip().lower() == "ok":
             _LOGGER.debug("Received 'ok' acknowledgment.")
-            # Vi behöver inte göra mer med "ok", så vi avbryter här.
+            # We don't need to do anything more so we stop here
             return
 
-        # Om det inte var "ok", försök tolka som JSON
+        # If not "ok", try it as JSON
         try:
             data = json.loads(message)
             _LOGGER.debug(f"Received Parsed JSON: {data}") # Ändrat från Received:
 
-            # Kolla om det är ett heartbeat-svar
+            # Check if it is HEARTBEAT message
             if data.get("ModeCode") == MSG_TYPE_HEARTBEAT:
                 _LOGGER.debug("Received heartbeat response")
-                # Avbryt här, vi vill inte lagra heartbeat som vanlig data
+                # We don't need to do anything with this data
                 return
 
-            # Om det är giltig JSON och inte heartbeat, uppdatera lagrad data
+            # If it is JSON and not heartbeat, update stored data
             self._latest_raw_data.update(data)
 
-            # Uppdatera Home Assistant med den processade datan
-            # Kanske bara uppdatera om datan faktiskt ändrats? (Mer avancerat)
-            # self.hass.data[DOMAIN]["latest_raw_data"] = self._latest_raw_data.copy() # Använd copy?
-
         except json.JSONDecodeError:
-            # Hit kommer vi nu bara om det är ogiltig JSON som INTE är "ok"
+            # Log if it is not JSON and not "ok" message
             _LOGGER.warning(f"Invalid JSON received (and not 'ok'): {message}")
         except Exception as e:
             _LOGGER.error(f"Error handling non-JSON message '{message}': {e}")

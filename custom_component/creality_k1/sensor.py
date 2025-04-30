@@ -8,8 +8,9 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.entity import DeviceInfo
 
-from .const import DOMAIN, PRINTER_STATE_MAP, DEFAULT_PRINTER_STATE
+from .const import DOMAIN, PRINTER_STATE_MAP, DEFAULT_PRINTER_STATE, SENSOR_NAME_BED_TEMP, SENSOR_NAME_BOX_TEMP, SENSOR_NAME_NOZZLE_TEMP, SENSOR_NAME_PRINT_PROGRESS, SENSOR_NAME_TOTAL_LAYER, SENSOR_NAME_WORKING_LAYER, SENSOR_NAME_USED_MATERIAL, SENSOR_NAME_TOTAL_PRINT_TIME, SENSOR_NAME_PRINT_JOB_LEFT, SENSOR_NAME_PRINT_STATE
 from .coordinator import CrealityK1DataUpdateCoordinator  # DataUpdateCoordinator class from coordinator.py
 
 _LOGGER = logging.getLogger(__name__)
@@ -20,18 +21,18 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Creality K1 sensors."""
-    coordinator: CrealityK1DataUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]
+    coordinator: CrealityK1DataUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]["coordinator"]
     async_add_entities([
-        K1NozzleTemperatureSensor(coordinator),
-        K1BedTemperatureSensor(coordinator),
-        K1BoxTemperatureSensor(coordinator),
-        K1PrintProgressSensor(coordinator),
-        K1TotalLayerSensor(coordinator),
-        K1WorkingLayerSensor(coordinator),
-        K1UsedMaterialSensor(coordinator),
-        K1PrintJobTimeSensor(coordinator),
-        K1PrintLeftTimeSensor(coordinator),
-        K1PrintState(coordinator),
+        K1NozzleTemperatureSensor(coordinator, config_entry),
+        K1BedTemperatureSensor(coordinator, config_entry),
+        K1BoxTemperatureSensor(coordinator, config_entry),
+        K1PrintProgressSensor(coordinator, config_entry),
+        K1TotalLayerSensor(coordinator, config_entry),
+        K1WorkingLayerSensor(coordinator, config_entry),
+        K1UsedMaterialSensor(coordinator, config_entry),
+        K1PrintJobTimeSensor(coordinator, config_entry),
+        K1PrintLeftTimeSensor(coordinator, config_entry),
+        K1PrintState(coordinator, config_entry),
     ])
 
 
@@ -41,12 +42,13 @@ class K1Sensor(CoordinatorEntity, SensorEntity):
     def __init__(
         self,
         coordinator: CrealityK1DataUpdateCoordinator,
+        entry: ConfigEntry,
         name: str,
         device_class: SensorDeviceClass | None = None,
         unit_of_measurement: str | None = None,
         state_class: SensorStateClass | None = None,
         icon: str | None = None,
-        unique_id: str | None = None,  # Lägg till unique_id här
+        unique_id_suffix: str | None = None,  # Lägg till unique_id här
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
@@ -55,7 +57,14 @@ class K1Sensor(CoordinatorEntity, SensorEntity):
         self._attr_native_unit_of_measurement = unit_of_measurement
         self._attr_state_class = state_class
         self._attr_icon = icon
-        self._attr_unique_id = unique_id  # Lägg till unique_id här
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)}, # Koppla till enheten via config entry ID
+            name=entry.title, # Standardnamn, uppdateras i __init__.py
+            manufacturer="Creality",
+            model=coordinator.data.get("model", "K1 Series"),
+        )
+        if unique_id_suffix:
+            self._attr_unique_id = f"{entry.entry_id}_{unique_id_suffix}"
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -67,16 +76,18 @@ class K1NozzleTemperatureSensor(K1Sensor):
     """Representation of a Creality K1 Nozzle Temperature sensor."""
 
     def __init__(
-        self, coordinator: CrealityK1DataUpdateCoordinator
+        self, coordinator: CrealityK1DataUpdateCoordinator, entry: ConfigEntry
     ) -> None:
         """Initialize the nozzle temperature sensor."""
         super().__init__(
-            coordinator,
-            name="K1 Nozzle Temperature",
+            coordinator=coordinator,
+            entry=entry, # Pass entry
+            name= SENSOR_NAME_NOZZLE_TEMP,
             device_class=SensorDeviceClass.TEMPERATURE,
             state_class=SensorStateClass.MEASUREMENT,
             unit_of_measurement=UnitOfTemperature.CELSIUS,
-            unique_id="creality_k1_nozzle_temperature",
+            unique_id_suffix="nozzle_temperature", # Pass suffix
+            icon="mdi:thermometer" # Optional: Explicitly set icon if needed
         )
 
     @property
@@ -109,16 +120,18 @@ class K1BedTemperatureSensor(K1Sensor):
     """Representation of a Creality K1 Bed Temperature sensor."""
 
     def __init__(
-        self, coordinator: CrealityK1DataUpdateCoordinator
+        self, coordinator: CrealityK1DataUpdateCoordinator, entry: ConfigEntry
     ) -> None:
         """Initialize the bed temperature sensor."""
         super().__init__(
-            coordinator,
-            name="K1 Bed Temperature",
+            coordinator=coordinator,
+            entry=entry, # Pass entry
+            name=SENSOR_NAME_BED_TEMP,
             device_class=SensorDeviceClass.TEMPERATURE,
             state_class=SensorStateClass.MEASUREMENT,
             unit_of_measurement=UnitOfTemperature.CELSIUS,
-            unique_id="creality_k1_bed_temperature",
+            unique_id_suffix="bed_temperature", # Pass suffix
+            icon="mdi:thermometer" # Optional: Explicitly set icon if needed
         )
 
     @property
@@ -151,16 +164,18 @@ class K1BoxTemperatureSensor(K1Sensor):
     """Representation of a Creality K1 Box Temperature sensor."""
 
     def __init__(
-        self, coordinator: CrealityK1DataUpdateCoordinator
+        self, coordinator: CrealityK1DataUpdateCoordinator, entry: ConfigEntry
     ) -> None:
         """Initialize the box temperature sensor."""
         super().__init__(
-            coordinator,
-            name="K1 Box Temperature",
+            coordinator=coordinator,
+            entry=entry, # Pass entry
+            name=SENSOR_NAME_BOX_TEMP,
             device_class=SensorDeviceClass.TEMPERATURE,
             state_class=SensorStateClass.MEASUREMENT,
             unit_of_measurement=UnitOfTemperature.CELSIUS,
-            unique_id="creality_k1_box_temperature",
+            unique_id_suffix="box_temperature", # Pass suffix
+            icon="mdi:thermometer" # Optional: Explicitly set icon if needed
         )
 
     @property
@@ -183,17 +198,18 @@ class K1PrintProgressSensor(K1Sensor):
     """Representation of a Creality K1 Print Progress sensor."""
 
     def __init__(
-        self, coordinator: CrealityK1DataUpdateCoordinator
+        self, coordinator: CrealityK1DataUpdateCoordinator, entry: ConfigEntry
     ) -> None:
         """Initialize the print progress sensor."""
         super().__init__(
-            coordinator,
-            name="K1 Print Progress",
-            unique_id="creality_k1_print_progress",
+            coordinator=coordinator,
+            entry=entry, # Pass entry
+            name=SENSOR_NAME_PRINT_PROGRESS,
+            state_class=SensorStateClass.MEASUREMENT,
             unit_of_measurement=PERCENTAGE,
-            state_class=SensorStateClass.MEASUREMENT
+            unique_id_suffix="print_progress", # Pass suffix
+            icon="mdi:percent" # Optional: Explicitly set icon if needed
         )
-        self._attr_icon = "mdi:percent"
 
     @property
     def native_value(self) -> int | None:
@@ -215,15 +231,16 @@ class K1TotalLayerSensor(K1Sensor):
     """Representation of a Creality K1 Total Layer sensor."""
 
     def __init__(
-        self, coordinator: CrealityK1DataUpdateCoordinator
+        self, coordinator: CrealityK1DataUpdateCoordinator, entry: ConfigEntry
     ) -> None:
         """Initialize the total layer sensor."""
         super().__init__(
-            coordinator,
-            name="K1 Total Layer Count",
-            unique_id="creality_k1_total_layer_count",
+            coordinator=coordinator,
+            entry=entry, # Pass entry
+            name=SENSOR_NAME_TOTAL_LAYER,
+            unique_id_suffix="total_layer_count", # Pass suffix
+            icon="mdi:layers" # Optional: Explicitly set icon if needed
         )
-        self._attr_icon = "mdi:layers"
 
     @property
     def native_value(self) -> int | None:
@@ -245,15 +262,16 @@ class K1WorkingLayerSensor(K1Sensor):
     """Representation of a Creality K1 Working Layer sensor."""
 
     def __init__(
-        self, coordinator: CrealityK1DataUpdateCoordinator
+        self, coordinator: CrealityK1DataUpdateCoordinator, entry: ConfigEntry
     ) -> None:
         """Initialize the working layer sensor."""
         super().__init__(
-            coordinator,
-            name="K1 Working Layer",
-            unique_id="creality_k1_working_layer",
+            coordinator=coordinator,
+            entry=entry, # Pass entry
+            name=SENSOR_NAME_WORKING_LAYER,
+            unique_id_suffix="working_layer_count", # Pass suffix
+            icon="mdi:cube-outline" # Optional: Explicitly set icon if needed
         )
-        self._attr_icon = "mdi:cube-outline"
 
     @property
     def native_value(self) -> int | None:
@@ -275,17 +293,18 @@ class K1UsedMaterialSensor(K1Sensor):
     """Representation of a Creality K1 Used Material sensor."""
 
     def __init__(
-        self, coordinator: CrealityK1DataUpdateCoordinator
+        self, coordinator: CrealityK1DataUpdateCoordinator, entry: ConfigEntry
     ) -> None:
         """Initialize the used material sensor."""
         super().__init__(
-            coordinator,
-            name="K1 Used Material Length",
+            coordinator=coordinator,
+            entry=entry, # Pass entry
+            name=SENSOR_NAME_USED_MATERIAL,
+            state_class=SensorStateClass.MEASUREMENT,
             unit_of_measurement="cm",
-            unique_id="creality_k1_used_material_length",
-            state_class=SensorStateClass.MEASUREMENT
+            unique_id_suffix="used_material_length", # Pass suffix
+            icon="mdi:tape-measure" # Optional: Explicitly set icon if needed
         )
-        self._attr_icon = "mdi:tape"
 
     @property
     def native_value(self) -> int | None:
@@ -305,18 +324,19 @@ class K1UsedMaterialSensor(K1Sensor):
 class K1PrintJobTimeSensor(K1Sensor):
     """K1 Print Job Time Sensor."""
     def __init__(
-        self, coordinator: CrealityK1DataUpdateCoordinator
+        self, coordinator: CrealityK1DataUpdateCoordinator, entry: ConfigEntry
     ) -> None:
         """Initialize the print job time sensor."""
         super().__init__(
-            coordinator, 
-            name="Print Job Time",
-            unit_of_measurement="s",
-            unique_id="creality_k1_print_job_time",
+            coordinator=coordinator,
+            entry=entry, # Pass entry
+            name=SENSOR_NAME_TOTAL_PRINT_TIME,
             device_class=SensorDeviceClass.DURATION,
-            state_class=SensorStateClass.MEASUREMENT
+            state_class=SensorStateClass.MEASUREMENT,
+            unit_of_measurement="s",
+            unique_id_suffix="print_job_time", # Pass suffix
+            icon="mdi:timer-sand" # Optional: Explicitly set icon if needed
         )
-        self._attr_icon = "mdi:timer-sand"
 
     @property
     def native_value(self) -> int | None:
@@ -336,18 +356,19 @@ class K1PrintJobTimeSensor(K1Sensor):
 class K1PrintLeftTimeSensor(K1Sensor):
     """K1 Print Job Left Sensor."""
     def __init__(
-        self, coordinator: CrealityK1DataUpdateCoordinator
+        self, coordinator: CrealityK1DataUpdateCoordinator, entry: ConfigEntry
     ) -> None:
         """Initialize the print job left sensor."""
         super().__init__(
-            coordinator, 
-            name="Print Left Time",
-            unit_of_measurement="s",
-            unique_id="creality_k1_print_left_time",
+            coordinator=coordinator,
+            entry=entry, # Pass entry
+            name=SENSOR_NAME_PRINT_JOB_LEFT,
             device_class=SensorDeviceClass.DURATION,
-            state_class=SensorStateClass.MEASUREMENT
+            state_class=SensorStateClass.MEASUREMENT,
+            unit_of_measurement="s",
+            unique_id_suffix="print_left_time", # Pass suffix
+            icon="mdi:timer-sand" # Optional: Explicitly set icon if needed
         )
-        self._attr_icon = "mdi:timer-sand"
 
     @property
     def native_value(self) -> int | None:
@@ -367,17 +388,17 @@ class K1PrintLeftTimeSensor(K1Sensor):
 class K1PrintState(K1Sensor): 
     """K1 Print State Sensor"""
     def __init__(
-        self, coordinator: CrealityK1DataUpdateCoordinator
+        self, coordinator: CrealityK1DataUpdateCoordinator, entry: ConfigEntry
     ) -> None:
         """Initialize the print state Sensor."""
         super().__init__(
-            coordinator,
-            name="Print State",
-            unique_id="creality_k1_print_state_sensor",
+            coordinator=coordinator,
+            entry=entry, # Pass entry
+            name=SENSOR_NAME_PRINT_STATE,
+            unique_id_suffix="print_state_sensor", # Pass suffix
+            icon="mdi:printer-3d" # Optional: Explicitly set icon if needed
         )
-        self._attr_icon = "mdi:printer-3d"
-
-
+    
     @property
     def native_value(self) -> str | None: 
         """Return The Printers State as a descriptive string."""

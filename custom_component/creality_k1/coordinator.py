@@ -54,31 +54,12 @@ class CrealityK1DataUpdateCoordinator(DataUpdateCoordinator):
             raise UpdateFailed(f"Error communicating with Creality K1: {err}") from err
 
     def process_raw_data(self, raw_data: dict, stored_data: dict) -> dict:
-        """Process the raw data and return a flattened dictionary."""
-
-        # Get the current stored data from the node's context (or initialize it)
-        stored_data = stored_data.copy()
-
-        # Update stored data with the latest received data
-        for key, value in raw_data.items():
-            stored_data[key] = value
-
-        processed_data = {}
-
-        for key, value in stored_data.items():
-            if key == 'model':
-                processed_data['system'] = {
-                    'state': stored_data[key],
-                    'attributes': {
-                        'hostname': stored_data.get('hostname'),
-                        'Versions': stored_data.get('modelVersion')
-                    }
-                }
-            elif key in ('lightSw', 'fan', 'fanCase', 'fanAuxiliary'):
-                processed_data[key] = stored_data[key]
-            elif key not in ('hostname', 'modelVersion'):
-                processed_data[key] = stored_data[key]  # Store raw value directly
-
+        """Process the raw data and return the combined dictionary."""
+        # Skapa en kopia av den lagrade datan för att undvika sidoeffekter
+        processed_data = stored_data.copy()
+        # Uppdatera med den nya datan (nya värden skriver över gamla)
+        processed_data.update(raw_data)
+        # Returnera den kombinerade/uppdaterade datan
         return processed_data
 
     async def connect(self) -> None:
