@@ -5,7 +5,7 @@ import json
 import logging
 import time
 
-from .const import DOMAIN, MSG_TYPE_MSG, MSG_TYPE_HEARTBEAT, HEARTBEAT_INTERVAL, HEARTBEAT_TIMEOUT, RECONNECT_INTERVAL  # Om du har en const.py fil
+from .const import DOMAIN, MSG_TYPE_MSG, MSG_TYPE_HEARTBEAT, HEARTBEAT_INTERVAL, HEARTBEAT_TIMEOUT, RECONNECT_INTERVAL  
 from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
@@ -34,39 +34,56 @@ class MyWebSocket:
         await self.connect_and_start_tasks()
 
     async def connect_and_start_tasks(self) -> bool:
-        """Attempts to connect and start heartbeat/receive tasks."""
+        """
+        Attempts to connect and start heartbeat/receive tasks.
+        This method will raise ConnectionError on failure to let the
+        caller (e.g., async_setup_entry) handle the retry logic.
+        """
         if self._is_connected:
+            _LOGGER.debug("connect_and_start_tasks called but already connected.")
             return True
+            
         if self._shutting_down:
             _LOGGER.info("WebSocket is shutting down, not attempting to connect.")
             return False
 
         try:
-            # Ensure any old tasks/ws are cleaned before new connection attempt
+            # Ensure any old tasks or websocket connections are cleaned up
+            # before attempting a new connection.
             await self._cleanup_connection_resources()
 
             _LOGGER.info(f"Attempting to connect to {self.url}...")
-            # Add a timeout for the connection attempt itself
+            # Add a timeout for the connection attempt itself to prevent it from hanging.
             self.ws = await asyncio.wait_for(
                 websockets.connect(self.url, ping_interval=None, ping_timeout=None),
-                timeout=10  # Example: 10-second timeout for connection
+                timeout=10  # A 10-second timeout for the connection attempt.
             )
+            
             _LOGGER.info(f"Successfully connected to {self.url}")
             self._is_connected = True
+            
+            # Start background tasks for heartbeat and receiving messages.
             self.heartbeat_task = asyncio.create_task(self._send_heartbeat_loop())
             self.receive_task = asyncio.create_task(self._receive_messages_loop())
+            
             return True
-        except asyncio.TimeoutError:
-            _LOGGER.error(f"Connection to {self.url} timed out.")
-        except websockets.exceptions.WebSocketException as e: # More specific exceptions
-            _LOGGER.error(f"WebSocket connection failed: {e}")
-        except Exception as e:
-            _LOGGER.error(f"Failed to connect to {self.url}: {e}")
 
-        self._is_connected = False
-        # If connection fails, schedule a reconnect attempt
-        self._schedule_reconnect()
-        return False
+        except (asyncio.TimeoutError, websockets.exceptions.WebSocketException, OSError) as e:
+            # Catch specific, expected errors related to connection failure.
+            _LOGGER.error(f"Failed to connect to {self.url}: {e} ({type(e).__name__})")
+            self._is_connected = False
+            
+            # Raise an exception to let the calling function (in __init__.py)
+            # know that the setup failed. This allows Home Assistant's core retry
+            # mechanism to take over.
+            raise ConnectionError(f"Failed to connect to WebSocket at {self.url}") from e
+        
+        except Exception as e:
+            # Catch any other unexpected exceptions during connection.
+            _LOGGER.error(f"An unexpected error occurred while connecting to {self.url}: {e}")
+            self._is_connected = False
+            raise ConnectionError(f"An unexpected error occurred connecting to WebSocket: {e}") from e
+
 
     async def _cleanup_connection_resources(self):
         """Safely cancel tasks and close websocket."""
@@ -222,28 +239,46 @@ class MyWebSocket:
 
 
     async def _reconnect_cooldown_and_attempt(self) -> None:
-        """Waits for cooldown then attempts to reconnect. Ensures only one reconnect process runs."""
+        """
+        Waits for a cooldown, then enters a persistent loop
+        to attempt reconnection until successful.
+        """
         if self._shutting_down:
             return
 
-        async with self._reconnect_lock: # Ensure only one instance of this coroutine runs
-            if self._is_connected: # Check if already reconnected by another path
-                _LOGGER.info("Already reconnected, skipping scheduled reconnect attempt.")
+        # Use the lock to ensure only one persistent reconnect loop runs at a time.
+        async with self._reconnect_lock:
+            # If another task managed to connect while we were waiting for the lock, abort.
+            if self._is_connected:
+                _LOGGER.debug("Already reconnected, skipping reconnect loop.")
                 return
 
-            _LOGGER.warning(f"Attempting to reconnect in {RECONNECT_INTERVAL} seconds...")
-            await asyncio.sleep(RECONNECT_INTERVAL)
+            _LOGGER.info("Starting persistent reconnection attempts...")
+            while not self._is_connected and not self._shutting_down:
+                try:
+                    _LOGGER.debug("Executing reconnect attempt in loop.")
+                    # connect_and_start_tasks will return True on success
+                    # and raise ConnectionError on failure.
+                    if await self.connect_and_start_tasks():
+                        _LOGGER.info("Reconnection successful.")
+                        # The _is_connected flag is now True, so the while loop will exit.
+                        break
+                except ConnectionError:
+                    # This is expected if the printer is still offline/rebooting.
+                    _LOGGER.warning(
+                        f"Reconnect attempt failed. Retrying in {RECONNECT_INTERVAL} seconds..."
+                    )
+                except Exception as e:
+                    # Catch any other unexpected errors to prevent the loop from crashing.
+                    _LOGGER.error(f"Unexpected error during reconnect loop: {e}")
 
-            if self._shutting_down: # Check again after sleep
-                _LOGGER.info("Shutdown initiated during reconnect cooldown.")
-                return
+                # Wait before the next attempt in the loop.
+                await asyncio.sleep(RECONNECT_INTERVAL)
 
-            if self._is_connected: # Check again, connection might have been restored
-                 _LOGGER.info("Connection restored before reconnect attempt, aborting.")
-                 return
-
-            _LOGGER.info("Executing reconnect attempt.")
-            await self.connect_and_start_tasks()
+            if self._shutting_down:
+                _LOGGER.info("Shutdown initiated, stopping reconnect attempts.")
+            
+            _LOGGER.debug("Exited persistent reconnection loop.")
 
     async def clear(self) -> None:
         """Close the WebSocket connection and cleanup."""

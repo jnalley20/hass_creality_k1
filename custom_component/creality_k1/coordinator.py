@@ -36,6 +36,13 @@ class CrealityK1DataUpdateCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self) -> dict:
         """Fetch data from Creality K1."""
+        
+        # Check connection status first before trying to update data.
+        if not self.websocket._is_connected:
+            _LOGGER.warning("Coordinator update failed: WebSocket is not connected.")
+            # Raise UpdateFailed to signal to HA that entities are unavailable
+            raise UpdateFailed("WebSocket is not connected.")
+        
         try:
             raw_data = await self.websocket.get_latest_data()
             _LOGGER.debug(f"Coordinator: Fetched raw data: {raw_data}")

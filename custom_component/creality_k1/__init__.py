@@ -1,7 +1,7 @@
 """Creality K1 Max Integration."""
 import asyncio
 import logging
-import homeassistant.helpers.device_registry as dr # Lägg till denna import högst upp
+import homeassistant.helpers.device_registry as dr 
 
 from datetime import timedelta
 from homeassistant.config_entries import ConfigEntry
@@ -9,100 +9,76 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 
 from .const import DOMAIN, PLATFORMS
-from .websocket import MyWebSocket  # Din WebSocket-klass
-from .coordinator import CrealityK1DataUpdateCoordinator  # Din DataUpdateCoordinator
+from .websocket import MyWebSocket  # WebSocket class from websocket.py
+from .coordinator import CrealityK1DataUpdateCoordinator  # DataUpdateCoordinator class from coordinator.py
 
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up Creality K1 Max from a config entry."""
-    # 1. Hämta konfigurationsdata från config entry
-    printer_ip = entry.data.get("ip_address")  # Hämta IP från config entry
+    """Set up Creality K1 from a config entry."""
+    # 1. Get configuration data from the config entry
+    printer_ip = entry.data.get("ip_address")
     ws_url = f"ws://{printer_ip}:9999"
 
-    # 2. Skapa en WebSocket-klient
+    # 2. Create and connect the WebSocket client
+    # This will now raise ConnectionError on failure, which is caught below.
+    websocket = MyWebSocket(ws_url)
     try:
-        websocket = MyWebSocket(ws_url)
-        _LOGGER.debug("async_setup_entry: Initializing WebSocket")
+        _LOGGER.debug("Initializing WebSocket and attempting to connect...")
         await websocket.init(hass)
-        _LOGGER.debug("async_setup_entry: WebSocket initialized")
-    except Exception as e:
-        _LOGGER.error(f"Could not connect to Creality K1 Max: {e}")
+        _LOGGER.debug("WebSocket initialized and connected successfully.")
+    except ConnectionError as e:
+        # If the initial connection fails, raise ConfigEntryNotReady.
+        # Home Assistant will automatically retry the setup later.
+        _LOGGER.warning(f"Could not connect to Creality K1 at {printer_ip}: {e}. Setup will be retried.")
         raise ConfigEntryNotReady from e
 
-    # 3. Skapa en DataUpdateCoordinator
-    async def async_update_data():
-        """Fetch data from Creality K1 Max."""
-        try:
-            data = await websocket.get_latest_data()
-            _LOGGER.debug(f"async_update_data: Fetched data: {data}")
-            return data
-        except Exception as e:
-            raise UpdateFailed(f"Error fetching data: {e}") from e
-
+    # 3. Create the DataUpdateCoordinator
     coordinator = CrealityK1DataUpdateCoordinator(
-    hass,
-    websocket,  # Send websocket instance
-    update_interval=timedelta(seconds=5),
+        hass,
+        websocket,  # Pass the connected websocket instance
+        update_interval=timedelta(seconds=5),
     )
 
-    # --- Initial Device Registration (Minimal) ---
+    # 4. Fetch initial data from the coordinator.
+    # If this fails, ConfigEntryNotReady will be raised, and the setup will be retried.
+    # We no longer catch it here, letting the failure stop the setup process.
+    await coordinator.async_config_entry_first_refresh()
+
+    # 5. If we get here, connection and first data fetch were successful.
+    # Now, register the device with the correct name from the hostname.
     device_registry = dr.async_get(hass)
-    device_registry.async_get_or_create(
-        config_entry_id=entry.entry_id,
-        identifiers={(DOMAIN, entry.entry_id)},
-        name=entry.title, # Använd entry title temporärt
-        manufacturer="Creality",
-    )
-    # --- End Initial Registration ---
-
-    hostname_set_flag = False # Flagga för att bara uppdatera en gång
-
-    # Listener-funktion
-    def _update_device_name_listener():
-        nonlocal hostname_set_flag
-        if hostname_set_flag or not coordinator.data:
-            return # Redan uppdaterad eller ingen data
-
-        hostname = coordinator.data.get("hostname")
+    if coordinator.data and (hostname := coordinator.data.get("hostname")):
         printer_model = coordinator.data.get("model", "K1 Series")
+        device_registry.async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(DOMAIN, entry.entry_id)},
+            name=hostname,  # Use the fetched hostname as the device name
+            manufacturer="Creality",
+            model=printer_model,
+        )
+    else:
+        # Fallback in case hostname is not available after a successful refresh
+        _LOGGER.warning("Could not get hostname from initial data. Using default device name.")
+        device_registry.async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(DOMAIN, entry.entry_id)},
+            name=entry.title,  # Fallback to the title set during config flow
+            manufacturer="Creality",
+        )
 
-        if hostname:
-            _LOGGER.info(f"Hostname '{hostname}' found, updating device name.")
-            # Uppdatera enhetsposten med korrekt namn och modell
-            device_registry.async_get_or_create( # Används för att uppdatera
-                config_entry_id=entry.entry_id,
-                identifiers={(DOMAIN, entry.entry_id)},
-                name=hostname, # SÄTT RÄTT NAMN
-                manufacturer="Creality",
-                model=printer_model,
-            )
-            hostname_set_flag = True # Markera som uppdaterad
-            # remove_listener() # Ta eventuellt bort listenern efter lyckad uppdatering
-
-    # Försök första refresh
-    try:
-        await coordinator.async_config_entry_first_refresh()
-        # Försök uppdatera namnet direkt om data finns
-        _update_device_name_listener()
-    except ConfigEntryNotReady:
-        _LOGGER.warning("First refresh failed, device name will be updated later by listener.")
-        # Fortsätt setup ändå
-
-    # Lägg till listener som körs efter framtida lyckade coordinator-uppdateringar
-    remove_listener = coordinator.async_add_listener(_update_device_name_listener)
-    # Se till att listener tas bort när entry avlastas
-    entry.async_on_unload(remove_listener)
-
-    # Lagra coordinator/websocket per entry (som tidigare fixat)
+    # 6. Store coordinator and websocket instances per entry for platform access
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = {
         "coordinator": coordinator,
         "websocket": websocket,
     }
 
-    # Set up platforms
+    # 7. Set up platforms (sensor, switch, fan)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    # 8. Set up an unload listener for when the entry is removed or reloaded
+    entry.async_on_unload(entry.add_update_listener(async_reload_entry))
 
     return True
 
