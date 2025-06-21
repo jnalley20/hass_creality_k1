@@ -5,12 +5,12 @@ from typing import Any
 from homeassistant.const import UnitOfTemperature, PERCENTAGE, UnitOfTime
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.entity import DeviceInfo
 
-from .const import DOMAIN, PRINTER_STATE_MAP, DEFAULT_PRINTER_STATE, SENSOR_NAME_BED_TEMP, SENSOR_NAME_BOX_TEMP, SENSOR_NAME_NOZZLE_TEMP, SENSOR_NAME_PRINT_PROGRESS, SENSOR_NAME_TOTAL_LAYER, SENSOR_NAME_WORKING_LAYER, SENSOR_NAME_USED_MATERIAL, SENSOR_NAME_TOTAL_PRINT_TIME, SENSOR_NAME_PRINT_JOB_LEFT, SENSOR_NAME_PRINT_STATE
+from .const import DOMAIN, PRINTER_STATE_MAP, DEFAULT_PRINTER_STATE, SENSOR_NAME_BED_TEMP, SENSOR_NAME_BOX_TEMP, SENSOR_NAME_NOZZLE_TEMP, SENSOR_NAME_PRINT_PROGRESS, SENSOR_NAME_TOTAL_LAYER, SENSOR_NAME_WORKING_LAYER, SENSOR_NAME_USED_MATERIAL, SENSOR_NAME_TOTAL_PRINT_TIME, SENSOR_NAME_PRINT_JOB_LEFT, SENSOR_NAME_PRINT_STATE, DEVICE_MANUFACTURER, DEVICE_MODEL
 from .coordinator import CrealityK1DataUpdateCoordinator  # DataUpdateCoordinator class from coordinator.py
 
 _LOGGER = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Creality K1 sensors."""
-    coordinator: CrealityK1DataUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]["coordinator"]
+    coordinator: CrealityK1DataUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]
     async_add_entities([
         K1NozzleTemperatureSensor(coordinator, config_entry),
         K1BedTemperatureSensor(coordinator, config_entry),
@@ -42,14 +42,14 @@ class K1Sensor(CoordinatorEntity, SensorEntity):
     def __init__(
         self,
         coordinator: CrealityK1DataUpdateCoordinator,
-        entry: ConfigEntry,
+        config_entry: ConfigEntry,
         name: str,
         device_class: SensorDeviceClass | None = None,
         unit_of_measurement: str | None = None,
         state_class: SensorStateClass | None = None,
         icon: str | None = None,
         unique_id_suffix: str | None = None,  # Lägg till unique_id här
-    ) -> None:
+        ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._attr_name = name
@@ -58,31 +58,30 @@ class K1Sensor(CoordinatorEntity, SensorEntity):
         self._attr_state_class = state_class
         self._attr_icon = icon
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)}, # Koppla till enheten via config entry ID
-            name=entry.title, # Standardnamn, uppdateras i __init__.py
-            manufacturer="Creality",
-            model=coordinator.data.get("model", "K1 Series"),
+            identifiers={(DOMAIN, config_entry.entry_id)}, # Koppla till enheten via config entry ID
+            name=config_entry.title, # Standardnamn, uppdateras i __init__.py
+            manufacturer=DEVICE_MANUFACTURER,
+            model=DEVICE_MODEL,
         )
         if unique_id_suffix:
-            self._attr_unique_id = f"{entry.entry_id}_{unique_id_suffix}"
+            self._attr_unique_id = f"{config_entry.entry_id}_{unique_id_suffix}"
 
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        self.async_write_ha_state()
+    @property
+    def available(self) -> bool:
+        return self.coordinator.websocket.is_connected and super().available
 
 
 class K1NozzleTemperatureSensor(K1Sensor):
     """Representation of a Creality K1 Nozzle Temperature sensor."""
 
     def __init__(
-        self, coordinator: CrealityK1DataUpdateCoordinator, entry: ConfigEntry
-    ) -> None:
+        self, coordinator: CrealityK1DataUpdateCoordinator, config_entry: ConfigEntry
+        ) -> None:
         """Initialize the nozzle temperature sensor."""
         super().__init__(
             coordinator=coordinator,
-            entry=entry, # Pass entry
-            name= SENSOR_NAME_NOZZLE_TEMP,
+            config_entry=config_entry, # Pass entry
+            name=SENSOR_NAME_NOZZLE_TEMP,
             device_class=SensorDeviceClass.TEMPERATURE,
             state_class=SensorStateClass.MEASUREMENT,
             unit_of_measurement=UnitOfTemperature.CELSIUS,
@@ -93,7 +92,7 @@ class K1NozzleTemperatureSensor(K1Sensor):
     @property
     def native_value(self) -> float | None:
         """Return the current nozzle temperature."""
-        if self.coordinator.data:
+        if self.coordinator.data and self.coordinator.websocket.is_connected:
             nozzle_temp = self.coordinator.data.get("nozzleTemp")
             if isinstance(nozzle_temp, str):
                 try:
@@ -108,7 +107,7 @@ class K1NozzleTemperatureSensor(K1Sensor):
     @property
     def extra_state_attributes(self):
         """Return the sensor attributes."""
-        if self.coordinator.data:
+        if self.coordinator.data and self.coordinator.websocket.is_connected:
             return {
                 "target": self.coordinator.data.get("targetNozzleTemp"),
                 "max": self.coordinator.data.get("maxNozzleTemp"),
@@ -120,12 +119,12 @@ class K1BedTemperatureSensor(K1Sensor):
     """Representation of a Creality K1 Bed Temperature sensor."""
 
     def __init__(
-        self, coordinator: CrealityK1DataUpdateCoordinator, entry: ConfigEntry
-    ) -> None:
+        self, coordinator: CrealityK1DataUpdateCoordinator, config_entry: ConfigEntry
+        ) -> None:
         """Initialize the bed temperature sensor."""
         super().__init__(
             coordinator=coordinator,
-            entry=entry, # Pass entry
+            config_entry=config_entry, # Pass entry
             name=SENSOR_NAME_BED_TEMP,
             device_class=SensorDeviceClass.TEMPERATURE,
             state_class=SensorStateClass.MEASUREMENT,
@@ -137,7 +136,7 @@ class K1BedTemperatureSensor(K1Sensor):
     @property
     def native_value(self) -> float | None:
         """Return the current bed temperature."""
-        if self.coordinator.data:
+        if self.coordinator.data and self.coordinator.websocket.is_connected:
             bed_temp = self.coordinator.data.get("bedTemp0")
             if isinstance(bed_temp, str):
                 try:
@@ -152,7 +151,7 @@ class K1BedTemperatureSensor(K1Sensor):
     @property
     def extra_state_attributes(self):
         """Return the sensor attributes."""
-        if self.coordinator.data:
+        if self.coordinator.data and self.coordinator.websocket.is_connected:
             return {
                 "target": self.coordinator.data.get("targetBedTemp0"),
                 "max": self.coordinator.data.get("maxBedTemp"),
@@ -164,12 +163,12 @@ class K1BoxTemperatureSensor(K1Sensor):
     """Representation of a Creality K1 Box Temperature sensor."""
 
     def __init__(
-        self, coordinator: CrealityK1DataUpdateCoordinator, entry: ConfigEntry
-    ) -> None:
+        self, coordinator: CrealityK1DataUpdateCoordinator, config_entry: ConfigEntry
+        ) -> None:
         """Initialize the box temperature sensor."""
         super().__init__(
             coordinator=coordinator,
-            entry=entry, # Pass entry
+            config_entry=config_entry, # Pass entry
             name=SENSOR_NAME_BOX_TEMP,
             device_class=SensorDeviceClass.TEMPERATURE,
             state_class=SensorStateClass.MEASUREMENT,
@@ -181,7 +180,7 @@ class K1BoxTemperatureSensor(K1Sensor):
     @property
     def native_value(self) -> float | None:
         """Return the current box temperature."""
-        if self.coordinator.data:
+        if self.coordinator.data and self.coordinator.websocket.is_connected:
             box_temp = self.coordinator.data.get("boxTemp")
             if isinstance(box_temp, str):
                 try:
@@ -198,12 +197,12 @@ class K1PrintProgressSensor(K1Sensor):
     """Representation of a Creality K1 Print Progress sensor."""
 
     def __init__(
-        self, coordinator: CrealityK1DataUpdateCoordinator, entry: ConfigEntry
-    ) -> None:
+        self, coordinator: CrealityK1DataUpdateCoordinator, config_entry: ConfigEntry
+        ) -> None:
         """Initialize the print progress sensor."""
         super().__init__(
             coordinator=coordinator,
-            entry=entry, # Pass entry
+            config_entry=config_entry, # Pass entry
             name=SENSOR_NAME_PRINT_PROGRESS,
             state_class=SensorStateClass.MEASUREMENT,
             unit_of_measurement=PERCENTAGE,
@@ -214,7 +213,7 @@ class K1PrintProgressSensor(K1Sensor):
     @property
     def native_value(self) -> int | None:
         """Return the current print progress."""
-        if self.coordinator.data:
+        if self.coordinator.data and self.coordinator.websocket.is_connected:
             progress = self.coordinator.data.get("printProgress")
             if isinstance(progress, str):
                 try:
@@ -231,12 +230,12 @@ class K1TotalLayerSensor(K1Sensor):
     """Representation of a Creality K1 Total Layer sensor."""
 
     def __init__(
-        self, coordinator: CrealityK1DataUpdateCoordinator, entry: ConfigEntry
-    ) -> None:
+        self, coordinator: CrealityK1DataUpdateCoordinator, config_entry: ConfigEntry
+        ) -> None:
         """Initialize the total layer sensor."""
         super().__init__(
             coordinator=coordinator,
-            entry=entry, # Pass entry
+            config_entry=config_entry, # Pass entry
             name=SENSOR_NAME_TOTAL_LAYER,
             unique_id_suffix="total_layer_count", # Pass suffix
             icon="mdi:layers" # Optional: Explicitly set icon if needed
@@ -245,7 +244,7 @@ class K1TotalLayerSensor(K1Sensor):
     @property
     def native_value(self) -> int | None:
         """Return the total layer count."""
-        if self.coordinator.data:
+        if self.coordinator.data and self.coordinator.websocket.is_connected:
             total_layer = self.coordinator.data.get("TotalLayer")
             if isinstance(total_layer, str):
                 try:
@@ -262,12 +261,12 @@ class K1WorkingLayerSensor(K1Sensor):
     """Representation of a Creality K1 Working Layer sensor."""
 
     def __init__(
-        self, coordinator: CrealityK1DataUpdateCoordinator, entry: ConfigEntry
-    ) -> None:
+        self, coordinator: CrealityK1DataUpdateCoordinator, config_entry: ConfigEntry
+        ) -> None:
         """Initialize the working layer sensor."""
         super().__init__(
             coordinator=coordinator,
-            entry=entry, # Pass entry
+            config_entry=config_entry, # Pass entry
             name=SENSOR_NAME_WORKING_LAYER,
             unique_id_suffix="working_layer_count", # Pass suffix
             icon="mdi:cube-outline" # Optional: Explicitly set icon if needed
@@ -276,7 +275,7 @@ class K1WorkingLayerSensor(K1Sensor):
     @property
     def native_value(self) -> int | None:
         """Return the current working layer."""
-        if self.coordinator.data:
+        if self.coordinator.data and self.coordinator.websocket.is_connected:
             layer = self.coordinator.data.get("layer")
             if isinstance(layer, str):
                 try:
@@ -293,12 +292,12 @@ class K1UsedMaterialSensor(K1Sensor):
     """Representation of a Creality K1 Used Material sensor."""
 
     def __init__(
-        self, coordinator: CrealityK1DataUpdateCoordinator, entry: ConfigEntry
-    ) -> None:
+        self, coordinator: CrealityK1DataUpdateCoordinator, config_entry: ConfigEntry
+        ) -> None:
         """Initialize the used material sensor."""
         super().__init__(
             coordinator=coordinator,
-            entry=entry, # Pass entry
+            config_entry=config_entry, # Pass entry
             name=SENSOR_NAME_USED_MATERIAL,
             state_class=SensorStateClass.MEASUREMENT,
             unit_of_measurement="cm",
@@ -309,7 +308,7 @@ class K1UsedMaterialSensor(K1Sensor):
     @property
     def native_value(self) -> int | None:
         """Return the used material length."""
-        if self.coordinator.data:
+        if self.coordinator.data and self.coordinator.websocket.is_connected:
             used_material = self.coordinator.data.get("usedMaterialLength")
             if isinstance(used_material, str):
                 try:
@@ -324,12 +323,12 @@ class K1UsedMaterialSensor(K1Sensor):
 class K1PrintJobTimeSensor(K1Sensor):
     """K1 Print Job Time Sensor."""
     def __init__(
-        self, coordinator: CrealityK1DataUpdateCoordinator, entry: ConfigEntry
-    ) -> None:
+        self, coordinator: CrealityK1DataUpdateCoordinator, config_entry: ConfigEntry
+        ) -> None:
         """Initialize the print job time sensor."""
         super().__init__(
             coordinator=coordinator,
-            entry=entry, # Pass entry
+            config_entry=config_entry, # Pass entry
             name=SENSOR_NAME_TOTAL_PRINT_TIME,
             device_class=SensorDeviceClass.DURATION,
             state_class=SensorStateClass.MEASUREMENT,
@@ -341,7 +340,7 @@ class K1PrintJobTimeSensor(K1Sensor):
     @property
     def native_value(self) -> int | None:
         """Return the print job time."""
-        if self.coordinator.data:
+        if self.coordinator.data and self.coordinator.websocket.is_connected:
             print_job_time = self.coordinator.data.get("printJobTime")
             if isinstance(print_job_time, str):
                 try:
@@ -356,12 +355,12 @@ class K1PrintJobTimeSensor(K1Sensor):
 class K1PrintLeftTimeSensor(K1Sensor):
     """K1 Print Job Left Sensor."""
     def __init__(
-        self, coordinator: CrealityK1DataUpdateCoordinator, entry: ConfigEntry
-    ) -> None:
+        self, coordinator: CrealityK1DataUpdateCoordinator, config_entry: ConfigEntry
+        ) -> None:
         """Initialize the print job left sensor."""
         super().__init__(
             coordinator=coordinator,
-            entry=entry, # Pass entry
+            config_entry=config_entry, # Pass entry
             name=SENSOR_NAME_PRINT_JOB_LEFT,
             device_class=SensorDeviceClass.DURATION,
             state_class=SensorStateClass.MEASUREMENT,
@@ -373,7 +372,7 @@ class K1PrintLeftTimeSensor(K1Sensor):
     @property
     def native_value(self) -> int | None:
         """Return the print left time."""
-        if self.coordinator.data:
+        if self.coordinator.data and self.coordinator.websocket.is_connected:
             print_left_time = self.coordinator.data.get("printLeftTime")
             if isinstance(print_left_time, str):
                 try:
@@ -388,12 +387,12 @@ class K1PrintLeftTimeSensor(K1Sensor):
 class K1PrintState(K1Sensor): 
     """K1 Print State Sensor"""
     def __init__(
-        self, coordinator: CrealityK1DataUpdateCoordinator, entry: ConfigEntry
-    ) -> None:
+        self, coordinator: CrealityK1DataUpdateCoordinator, config_entry: ConfigEntry
+        ) -> None:
         """Initialize the print state Sensor."""
         super().__init__(
             coordinator=coordinator,
-            entry=entry, # Pass entry
+            config_entry=config_entry, # Pass entry
             name=SENSOR_NAME_PRINT_STATE,
             unique_id_suffix="print_state_sensor", # Pass suffix
             icon="mdi:printer-3d" # Optional: Explicitly set icon if needed
@@ -403,7 +402,7 @@ class K1PrintState(K1Sensor):
     def native_value(self) -> str | None: 
         """Return The Printers State as a descriptive string."""
         raw_state_value = None
-        if self.coordinator.data:
+        if self.coordinator.data and self.coordinator.websocket.is_connected:
             raw_state_value = self.coordinator.data.get("state")
 
         int_state: int | None = None
@@ -413,10 +412,11 @@ class K1PrintState(K1Sensor):
             except (ValueError, TypeError):
                 _LOGGER.warning(f"Invalid non-integer state value received: {raw_state_value}")
         elif raw_state_value is not None:
-             _LOGGER.warning(f"Unexpected state value type: {type(raw_state_value)} ({raw_state_value})")
+            _LOGGER.warning(f"Unexpected state value type: {type(raw_state_value)} ({raw_state_value})")
 
 
         if int_state is not None:
             return PRINTER_STATE_MAP.get(int_state, DEFAULT_PRINTER_STATE)
 
-        return DEFAULT_PRINTER_STATE 
+        #return DEFAULT_PRINTER_STATE 
+        return None
