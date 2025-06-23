@@ -18,6 +18,8 @@ This is a custom component for [Home Assistant](https://www.home-assistant.io/) 
 * **Controls:**
     * Turn LED Light On/Off.
     * Control Fan Speeds (Model Fan, Case/Back Fan, Side/Auxiliary Fan) via percentage. (Uses `M106` GCODE commands).
+    * Quick Buttons (Pause Print, Resume Print, Stop Print, Home XY, Home Z).
+    * Control Heaters (Nozzle and Bed) via On, Off and Target Temp. (Uses `M104` and `M140` GCODE commands).
 * **Local Control:** Communicates directly via the local network WebSocket.
 
 ## Requirements
@@ -37,6 +39,9 @@ This is a custom component for [Home Assistant](https://www.home-assistant.io/) 
     * Navigate to the `custom_components` folder. If it doesn't exist, create it.
     * Copy the entire `custom_components/creality_k1` folder (the one you downloaded/cloned) into the `custom_components` directory.
     * Your final path should look like `config/custom_component/creality_k1/`.
+    * Alternatively, to keep the git repo intact:
+        * git clone repo to `config/projects`.
+        * From `config/custom_components` directory create a symbolic link to the creality_k1 directory: `ln -s ../projects/hass_creality_k1/custom_component/creality_k1 creality_k1`
 3.  **Restart Home Assistant:** Restart your Home Assistant instance. (Settings > System > Restart).
 
 ## Configuration
@@ -75,11 +80,22 @@ This integration creates several entities, typically prefixed with the name you 
     * Current Layer
     * Total Layers
     * ... and can add potentially others depending on printer reports.
+* **Buttons (`button.`):**
+    * Pause Print
+    * Resume Print
+    * Stop Print
+    * Home XY
+    * Home Z
+    * ... easily add more, see `const.py` for examples.
+* **Heaters (`climate.`):**
+    * Nozzle Heater (with target temp control)
+    * Bed Heater (with target temp control)
 
 ## Troubleshooting / Notes
 
 * **Connection Issues:** Ensure your printer is powered on, connected to the network, and that the IP address entered during configuration is correct. Check for firewall rules blocking traffic between Home Assistant and the printer (specifically WebSocket traffic on port 9999).
 * **Fan Control:** Fan percentage is controlled by sending `M106 P<index> S<0-255>` GCODE commands via the WebSocket. `Pct` values reported by the printer reflect status but are not used for direct control.
+* **Heater Control:** Use a thermostat card in HA to control heaters.
 * **Firmware Differences:** Printer behavior and available data might vary slightly depending on the firmware version installed on your K1 / K1 Max.
 
 ## Disclaimer

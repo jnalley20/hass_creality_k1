@@ -19,7 +19,7 @@ _LOGGER = logging.getLogger(__name__)
 class CannotConnect(HomeAssistantError):
     """Error to indicate we cannot connect."""
 
-async def validate_connection(hass: HomeAssistant, ip_address: str) -> None:
+async def validate_connection(ip_address: str) -> None:
     """Validate the connection to the Creality K1."""
     ws_url = f"ws://{ip_address}:9999"
     try:
@@ -44,7 +44,7 @@ class CrealityK1ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             ip_address = user_input.get(CONF_IP_ADDRESS)
             try:
-                await validate_connection(self.hass, ip_address)
+                await validate_connection(ip_address)
                 return self.async_create_entry(title="Creality K1", data=user_input)
             except CannotConnect:
                 errors["base"] = "cannot_connect"
