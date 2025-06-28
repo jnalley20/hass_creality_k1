@@ -16,7 +16,7 @@ from homeassistant.helpers.entity import DeviceInfo
 
 from .const import DOMAIN, CLIMATE_CONTROLS, DEVICE_MANUFACTURER, DEVICE_MODEL
 from .coordinator import CrealityK1DataUpdateCoordinator
-from .helpers import to_float_or_none
+from .helpers import to_float_or_none, get_hw_sw_versions
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -41,6 +41,7 @@ async def async_setup_entry(
             )
         )
     async_add_entities(climates)
+
 
 class K1Climate(CoordinatorEntity, ClimateEntity):
     """Base class for Creality K1 heaters."""
@@ -82,13 +83,20 @@ class K1Climate(CoordinatorEntity, ClimateEntity):
         self._max_temp_key = max_temp_key
         self._config_entry = config_entry
         self._attr_unique_id = f"{config_entry.entry_id}_{heater_id}_climate"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, config_entry.entry_id)},
-            name=config_entry.title,
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return the device info."""
+        (hw_version, sw_version) = get_hw_sw_versions(self.coordinator.data)
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._config_entry.entry_id)},
+            name=self.coordinator.data.get('hostname', self._config_entry.title),
             manufacturer=DEVICE_MANUFACTURER,
-            model=DEVICE_MODEL,
-            via_device=(DOMAIN, config_entry.entry_id),
-            )
+            model=self.coordinator.data.get('model', DEVICE_MODEL),
+            hw_version=hw_version,
+            sw_version=sw_version,
+            via_device=(DOMAIN, self._config_entry.entry_id)
+        )
 
     @property
     def available(self) -> bool:

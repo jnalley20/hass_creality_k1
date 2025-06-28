@@ -2,7 +2,6 @@
 """Platform for Creality K1 fans that support percentage control via GCODE."""
 
 import logging
-import math
 from typing import Any
 
 from homeassistant.components.fan import FanEntity, FanEntityFeature
@@ -14,6 +13,7 @@ from homeassistant.helpers.entity import DeviceInfo
 
 from .const import DOMAIN, FAN_CONFIG, FAN_NAME_AUXILIARY_FAN, FAN_NAME_CASE_FAN, FAN_NAME_MODEL_FAN, DEVICE_MANUFACTURER, DEVICE_MODEL
 from .coordinator import CrealityK1DataUpdateCoordinator
+from .helpers import get_hw_sw_versions
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -69,17 +69,25 @@ class K1Fan(CoordinatorEntity, FanEntity):
         self._attr_name = name
         self._attr_icon = icon
         self._attr_unique_id = f"{config_entry.entry_id}_fan_{toggle_key.lower()}"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, config_entry.entry_id)}, # Koppla till enheten via config entry ID
-            name=config_entry.title, # Standardnamn, uppdateras i __init__.py
-            manufacturer=DEVICE_MANUFACTURER,
-            model=DEVICE_MODEL,
-            )
-
+        self._config_entry = config_entry
         _LOGGER.debug(
             f"Initializing Fan: {self.name} ({self.unique_id}) "
             f"using keys Pct='{self._percentage_key}', Toggle='{self._toggle_key}', GcodeP={self._p_index}"
             )
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return the device info."""
+        (hw_version, sw_version) = get_hw_sw_versions(self.coordinator.data)
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._config_entry.entry_id)},
+            name=self.coordinator.data.get('hostname', self._config_entry.title),
+            manufacturer=DEVICE_MANUFACTURER,
+            model=self.coordinator.data.get('model', DEVICE_MODEL),
+            hw_version=hw_version,
+            sw_version=sw_version,
+            via_device=(DOMAIN, self._config_entry.entry_id)
+        )
 
     @property
     def available(self) -> bool:

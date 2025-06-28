@@ -1,4 +1,4 @@
-"""WebSocket communication for Creality K1 Max."""
+"""WebSocket communication for Creality K1."""
 import asyncio
 import websockets
 import json
@@ -6,13 +6,13 @@ import logging
 import time
 from typing import Callable
 
-from .const import MSG_TYPE_HEARTBEAT, HEARTBEAT_INTERVAL, HEARTBEAT_TIMEOUT, WS_OPERATION_TIMEOUT  # Om du har en const.py fil
+from .const import MSG_TYPE_HEARTBEAT, HEARTBEAT_INTERVAL, WS_OPERATION_TIMEOUT
 from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 
 class MyWebSocket:
-    """Handles WebSocket communication with the Creality K1 Max."""
+    """Handles WebSocket communication with the Creality K1."""
 
     def __init__(
         self,

@@ -1,8 +1,7 @@
 """Platform for Creality K1 sensor."""
 import logging
-from typing import Any
 
-from homeassistant.const import UnitOfTemperature, PERCENTAGE, UnitOfTime
+from homeassistant.const import UnitOfTemperature, PERCENTAGE
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -12,6 +11,7 @@ from homeassistant.helpers.entity import DeviceInfo
 
 from .const import DOMAIN, PRINTER_STATE_MAP, DEFAULT_PRINTER_STATE, SENSOR_NAME_BED_TEMP, SENSOR_NAME_BOX_TEMP, SENSOR_NAME_NOZZLE_TEMP, SENSOR_NAME_PRINT_PROGRESS, SENSOR_NAME_TOTAL_LAYER, SENSOR_NAME_WORKING_LAYER, SENSOR_NAME_USED_MATERIAL, SENSOR_NAME_TOTAL_PRINT_TIME, SENSOR_NAME_PRINT_JOB_LEFT, SENSOR_NAME_PRINT_STATE, DEVICE_MANUFACTURER, DEVICE_MODEL
 from .coordinator import CrealityK1DataUpdateCoordinator  # DataUpdateCoordinator class from coordinator.py
+from .helpers import get_hw_sw_versions
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,6 +38,7 @@ async def async_setup_entry(
 
 class K1Sensor(CoordinatorEntity, SensorEntity):
     """Base class for Creality K1 sensors."""
+    _attr_has_entity_name = True
 
     def __init__(
         self,
@@ -57,14 +58,23 @@ class K1Sensor(CoordinatorEntity, SensorEntity):
         self._attr_native_unit_of_measurement = unit_of_measurement
         self._attr_state_class = state_class
         self._attr_icon = icon
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, config_entry.entry_id)}, # Koppla till enheten via config entry ID
-            name=config_entry.title, # Standardnamn, uppdateras i __init__.py
-            manufacturer=DEVICE_MANUFACTURER,
-            model=DEVICE_MODEL,
-        )
+        self._config_entry = config_entry
         if unique_id_suffix:
             self._attr_unique_id = f"{config_entry.entry_id}_{unique_id_suffix}"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return the device info."""
+        (hw_version, sw_version) = get_hw_sw_versions(self.coordinator.data)
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._config_entry.entry_id)},
+            name=self.coordinator.data.get('hostname', self._config_entry.title),
+            manufacturer=DEVICE_MANUFACTURER,
+            model=self.coordinator.data.get('model', DEVICE_MODEL),
+            hw_version=hw_version,
+            sw_version=sw_version,
+            via_device=(DOMAIN, self._config_entry.entry_id)
+        )
 
     @property
     def available(self) -> bool:
@@ -414,9 +424,7 @@ class K1PrintState(K1Sensor):
         elif raw_state_value is not None:
             _LOGGER.warning(f"Unexpected state value type: {type(raw_state_value)} ({raw_state_value})")
 
-
         if int_state is not None:
             return PRINTER_STATE_MAP.get(int_state, DEFAULT_PRINTER_STATE)
 
-        #return DEFAULT_PRINTER_STATE 
         return None
