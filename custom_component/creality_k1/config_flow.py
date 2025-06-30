@@ -6,13 +6,12 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.const import (
-    CONF_IP_ADDRESS,
+    CONF_IP_ADDRESS
 )
-from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 
-from .const import DOMAIN
+from .const import DOMAIN, DEVICE_MANUFACTURER, DEVICE_MODEL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,7 +27,7 @@ async def validate_connection(ip_address: str) -> None:
             response = await websocket.recv()
             _LOGGER.debug(f"Response from printer: {response}")
             if response:
-                return True
+                return
             else:
                 raise CannotConnect
     except Exception as e:
@@ -45,7 +44,7 @@ class CrealityK1ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ip_address = user_input.get(CONF_IP_ADDRESS)
             try:
                 await validate_connection(ip_address)
-                return self.async_create_entry(title="Creality K1", data=user_input)
+                return self.async_create_entry(title=f'{DEVICE_MANUFACTURER} {DEVICE_MODEL}', data=user_input)
             except CannotConnect:
                 errors["base"] = "cannot_connect"
             except Exception:  # Generell felhantering

@@ -20,3 +20,15 @@ def to_float_or_none(data: Any, key: str) -> float | None:
     except (ValueError, TypeError):
         _LOGGER.debug(f"Could not convert value '{value}' to float.")
         return None
+
+def get_hw_sw_versions(data: Any) -> tuple | None:
+    """Attempts to get the K1 HW and SW versions"""
+    try:
+        return (
+            # HW Version
+            data.get('modelVersion').split(';')[2].split(':')[1],
+            # SW Version
+            data.get('modelVersion').split(';')[3].split(':')[1]
+        )
+    except:
+        return (None, None)

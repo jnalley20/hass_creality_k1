@@ -8,7 +8,6 @@ PLATFORMS = (Platform.SENSOR, Platform.SWITCH, Platform.FAN, Platform.BUTTON, Pl
 # WebSocket-relaterade konstanter
 MSG_TYPE_HEARTBEAT = "heart_beat"  # Hjärtslagsmeddelande
 HEARTBEAT_INTERVAL = 5  # Sekunder
-HEARTBEAT_TIMEOUT = 1  # Sekunder
 WS_OPERATION_TIMEOUT = 10 # seconds
 HASS_UPDATE_INTERVAL = 30 # seconds
 
@@ -63,9 +62,8 @@ CLIMATE_CONTROLS = (
 )
 
 # Enhetsinformation
-DEVICE_NAME = "K1 Printer"
 DEVICE_MANUFACTURER = "Creality"
-DEVICE_MODEL = "K1 Max"
+DEVICE_MODEL = "K1"
 PRINTER_STATE_MAP = {
     0: "Stopped",        
     1: "Printing",

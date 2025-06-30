@@ -1,13 +1,13 @@
 """DataUpdateCoordinator for the Creality K1 integration."""
-import asyncio
 import logging
 from datetime import timedelta
 
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import CONF_IP_ADDRESS
 from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
-    UpdateFailed,
+    UpdateFailed
 )
 
 from .const import DOMAIN, HASS_UPDATE_INTERVAL, WS_OPERATION_TIMEOUT
@@ -31,7 +31,7 @@ class CrealityK1DataUpdateCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(seconds=HASS_UPDATE_INTERVAL)
             )
         self.latest_data = {}  # Store the processed data
-        printer_ip = config_entry.data.get("ip_address")  # Hämta IP från config entry
+        printer_ip = config_entry.data.get(CONF_IP_ADDRESS)  # Hämta IP från config entry
         ws_url = f"ws://{printer_ip}:9999"
         self.websocket = MyWebSocket(
             hass=hass,
